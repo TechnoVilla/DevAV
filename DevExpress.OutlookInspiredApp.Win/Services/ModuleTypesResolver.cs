@@ -17,6 +17,7 @@
     }
     class ModuleTypesResolver : IModuleTypesResolver {
         
+
         public string GetName(ModuleType moduleType)
         {
             if(moduleType == ModuleType.Unknown)
@@ -51,7 +52,8 @@
                 case ModuleType.QuotesFilterPane:
                     return new System.Guid("f4e3551d-6679-4db6-a103-1e25d7bc83a6");
                 case ModuleType.Dashboards:
-                case ModuleType.DashboardsFilterPane:
+                case ModuleType.DashboardsPane:
+                case ModuleType.DashboardsEdit:
                     return new System.Guid("f4e3551d-6679-4db6-a103-1e25d7bc83a7");
                 default:
                     return System.Guid.Empty;
@@ -75,7 +77,8 @@
                 case ModuleType.QuotesFilterPane:
                     return ModuleType.Quotes;
                 case ModuleType.Dashboards:
-                case ModuleType.DashboardsFilterPane:
+                case ModuleType.DashboardsPane:
+                case ModuleType.DashboardsEdit:
                     return ModuleType.Dashboards;
                 default:
                     return ModuleType.Unknown;
@@ -127,17 +130,6 @@
             }
         }
 
-        public ModuleType GetDashboardModuleType(ModuleType type)
-        {
-            switch (type)
-            {
-                case ModuleType.Dashboards:
-                case ModuleType.DashboardsFilterPane:
-                    return ModuleType.DashboardsEditView;
-                default:
-                    return ModuleType.Unknown;
-            }
-        }
 
         public ModuleType GetPeekModuleType(ModuleType moduleType) {
             switch(moduleType) {
@@ -189,8 +181,22 @@
                 case ModuleType.QuotesFilterPane:
                     return ModuleType.QuotesFilterPane;
                 case ModuleType.Dashboards:
-                case ModuleType.DashboardsFilterPane:
-                    return ModuleType.DashboardsFilterPane;
+                case ModuleType.DashboardsPane:
+                case ModuleType.DashboardsEdit:
+                    return ModuleType.DashboardsPane;
+                default:
+                    return ModuleType.Unknown;
+            }
+        }
+
+        public ModuleType GetDashboardModuleType(ModuleType type)
+        {
+            switch(type)
+            {
+                case ModuleType.Dashboards:
+                case ModuleType.DashboardsPane:
+                case ModuleType.DashboardsEdit:
+                    return ModuleType.DashboardsPane;
                 default:
                     return ModuleType.Unknown;
             }

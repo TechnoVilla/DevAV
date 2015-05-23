@@ -24,7 +24,8 @@
                 case ModuleType.QuotesFilterPane:
                     return "Opportunities";
                 case ModuleType.Dashboards:
-                case ModuleType.DashboardsFilterPane:
+                case ModuleType.DashboardsPane:
+                case ModuleType.DashboardsEdit:
                     return "Dashboards";
                 default:
                     return moduleType.ToString();

@@ -1,38 +1,37 @@
-using DevExpress.Mvvm;
-using DevExpress.Mvvm.DataAnnotations;
-using DevExpress.XtraEditors;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using DevExpress.DashboardCommon;
 using System.IO;
+using DevExpress.DashboardCommon;
+using DevExpress.Mvvm.DataAnnotations;
+using DevExpress.Mvvm;
 
 namespace DevExpress.OutlookInspiredApp.Win.ViewModel
 {
     public class DashboardsViewModel
     {
-        private IEnumerable<OrderEntity> _orders;
+        // name of dashboard datasource
         internal const string DataSourceName = "Opportunities";
+        // name of dashboard directory
         internal const string DataSourceDirectory = "Dashboards";
-        public virtual IEnumerable<OrderEntity> Orders
-        {
-            get
-            {
-                return _orders;
-            }
-        }
+        // path to dashboard directory
+        public string DashboardDirectory { get; private set; }
+        // available dashboards
+        public string[] Dashboards { get; private set; }
+        // current dashboard
+        public virtual string CurrentDashboard { get; set; }
+        // datasource for dashboards
+        public IEnumerable<OrderEntity> Orders { get; private set; }
 
         public DashboardsViewModel()
         {
             DashboardDirectory = Path.Combine(Environment.CurrentDirectory, DataSourceDirectory);
+            CurrentDashboard = string.Empty;
             Refresh();
         }
 
-        public string DashboardDirectory { get; private set; }
-        public string[] Dashboards { get; private set; }
-        public string CurrentDashboardPath { get; set; }
-
+        // 2. In the ViewModel we need this property
         [ServiceProperty]
         public virtual IDocumentManagerService DocumentManagerService
         {
@@ -42,67 +41,50 @@ namespace DevExpress.OutlookInspiredApp.Win.ViewModel
             }
         }
 
-        [Command]
-        public void ShowNewDashboard()
+        // 3. Whenever you want to instantiate, use this:
+        // var document = DocumentManagerService.CreateDocument("DashboardsEdit", someParameter, this);
+        // if (document != null)
+        //		document.Show();
+        public void OpenDashboard(Dashboard dashboard)
         {
-            var dashboard = new Dashboard();
-            dashboard.AddDataSource(DataSourceName, Orders);
-            Edit(dashboard);
-        }
-
-        [Command]
-        public void Refresh()
-        {
-            RefreshData();
-            RefreshDashboards();
-        }
-
-        [Command]
-        public void EditDashboard()
-        {
-            var dashboard = FromPath(CurrentDashboardPath);
-            Edit(dashboard);
-        }
-
-        internal void RefreshData()
-        {
-            var viewModel = DevExpress.Mvvm.POCO.ViewModelSource.Create<OrderCollectionViewModel>();
-            _orders = OrderEntity.Map(viewModel.Entities).ToList();
-        }
-
-        internal void RefreshDashboards()
-        {
-            if (!Directory.Exists(DashboardDirectory))
-                Directory.CreateDirectory(DashboardDirectory);
-
-            Dashboards = Directory.EnumerateFiles(DashboardDirectory, "*.xml").ToArray();
-        }
-
-        public void Save(Dashboard dashboard)
-        {
-            dashboard.SaveToXml(DashboardPath(dashboard));
-            RefreshDashboards();
-        }
-
-        public void Edit(Dashboard dashboard)
-        {
-            var document = DocumentManagerService.CreateDocument("DashboardEditor", dashboard, this);
+            var document = DocumentManagerService.CreateDocument("DashboardsEdit", dashboard, this);
             if (document != null)
                 document.Show();
         }
 
-        public string DashboardPath(Dashboard dashboard)
+        /// <summary>
+        /// Refresh Opportunities data source and list of dashboards
+        /// </summary>
+        public void Refresh()
         {
-            return string.Format("{0}\\{1}.xml", DashboardDirectory, dashboard.Title.Text);
+            // refresh datashboard source data
+            Orders = OrderEntity.Get().ToList();
+
+            // refresh list of dashboards
+            if (!Directory.Exists(DashboardDirectory))
+                Directory.CreateDirectory(DashboardDirectory);
+            Dashboards = Directory.EnumerateFiles(DashboardDirectory, "*.xml").ToArray();
+
+            if (Dashboards.Length > 0)
+                CurrentDashboard = Dashboards[0];
         }
 
-        public Dashboard FromPath(string path)
+        /// <summary>
+        /// Gets current dashboard
+        /// </summary>
+        /// <returns>Dashboard object</returns>
+        public Dashboard GetCurrentDashboard()
         {
             var dashboard = new Dashboard();
-            dashboard.LoadFromXml(path);
+            dashboard.LoadFromXml(CurrentDashboard);
             return BindDashboard(dashboard);
         }
 
+        /// <summary>
+        /// Bind dashboard object to Opportunities data source
+        /// </summary>
+        /// <param name="dashboard">Dashboard to bind</param>
+        /// <returns>Bound dashboard</returns>
         public Dashboard BindDashboard(Dashboard dashboard)
         {
             if (dashboard.DataSources.Count() == 0)
@@ -111,6 +93,32 @@ namespace DevExpress.OutlookInspiredApp.Win.ViewModel
                 dashboard.DataSources[0].Data = Orders;
 
             return dashboard;
+        }
+
+        [Command]
+        public void NewDashboard()
+        {
+            Dashboard d = new Dashboard();
+            BindDashboard(d);
+            OpenDashboard(d);
+        }
+
+        [Command]
+        public void EditDashboard()
+        {
+            OpenDashboard(GetCurrentDashboard());
+        }
+        public void Save(Dashboard dashboard)
+        {
+            var file = string.Format("{0}\\{1}.xml", DashboardDirectory, dashboard.Title.Text);
+            dashboard.SaveToXml(file);
+            // refresh dashboard list just in case
+            Dashboards = Directory.EnumerateFiles(DashboardDirectory, "*.xml").ToArray();
+            
+            // send out messages
+            CurrentDashboard = file;
+            Messenger.Default.Send<DashboardMessage>(DashboardMessage.View());
+            Messenger.Default.Send<DashboardMessage>(DashboardMessage.Refresh());
         }
 
     }
@@ -133,9 +141,10 @@ namespace DevExpress.OutlookInspiredApp.Win.ViewModel
         public double CustomerLat { get; set; }
         public double CustomerLong { get; set; }
 
-        public static IEnumerable<OrderEntity> Map(IList<DevAV.Order> orders)
+        public static IEnumerable<OrderEntity> Get()
         {
-            foreach (var order in orders)
+            var viewModel = DevExpress.Mvvm.POCO.ViewModelSource.Create<OrderCollectionViewModel>();
+            foreach (var order in viewModel.Entities)
             {
                 yield return new OrderEntity()
                 {
@@ -169,6 +178,8 @@ namespace DevExpress.OutlookInspiredApp.Win.ViewModel
     public class DashboardMessage
     {
         public static DashboardMessage Refresh() { return new DashboardMessage(DashboardMessageType.Refresh); }
+        public static DashboardMessage View() { return new DashboardMessage(DashboardMessageType.View); }
+
         public DashboardMessage(DashboardMessageType messageType)
         {
             MessageType = messageType;
